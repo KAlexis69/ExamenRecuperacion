@@ -44,26 +44,32 @@ public class EstudianteControlador {
         String insertEstudiante = "INSERT INTO estudiante (idPersona) VALUES (?)";
 
         try (Connection connection = conexionBDD.getConnection()) {
-            // Insertar Continente si no existe
-            try (PreparedStatement stmt = connection.prepareStatement(insertContinente)) {
+            int idContinente;
+
+   
+            try (PreparedStatement stmt = connection.prepareStatement(insertContinente, Statement.RETURN_GENERATED_KEYS)) {
                 stmt.setString(1, nombreContinente);
                 stmt.executeUpdate();
-            }
 
-            // Obtener idContinente
-            int idContinente;
-            try (PreparedStatement stmt = connection.prepareStatement(selectContinenteId)) {
-                stmt.setString(1, nombreContinente);
-                try (ResultSet rs = stmt.executeQuery()) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
                     if (rs.next()) {
-                        idContinente = rs.getInt("idContinente");
+                        idContinente = rs.getInt(1);
                     } else {
-                        throw new SQLException("Continente no encontrado.");
+                        // Buscar el idContinente si ya existía
+                        try (PreparedStatement stmt2 = connection.prepareStatement(selectContinenteId)) {
+                            stmt2.setString(1, nombreContinente);
+                            try (ResultSet rs2 = stmt2.executeQuery()) {
+                                if (rs2.next()) {
+                                    idContinente = rs2.getInt("idContinente");
+                                } else {
+                                    throw new SQLException("Error al obtener el ID del continente.");
+                                }
+                            }
+                        }
                     }
                 }
             }
 
-            // Obtener o Insertar País
             int idPais;
             try (PreparedStatement stmt = connection.prepareStatement(selectPaisId)) {
                 stmt.setString(1, nombrePais);
@@ -75,7 +81,7 @@ public class EstudianteControlador {
                             stmt2.setString(1, nombrePais);
                             stmt2.setInt(2, idContinente);
                             stmt2.executeUpdate();
-                            
+
                             // Obtener el idPais generado
                             try (ResultSet rs2 = stmt2.getGeneratedKeys()) {
                                 if (rs2.next()) {
@@ -89,14 +95,13 @@ public class EstudianteControlador {
                 }
             }
 
-            // Insertar Persona
             int idPersona;
             try (PreparedStatement stmt = connection.prepareStatement(insertPersona, Statement.RETURN_GENERATED_KEYS)) {
                 stmt.setString(1, nombre);
                 stmt.setString(2, apellido);
                 stmt.setString(3, cedula);
                 stmt.executeUpdate();
-                
+
                 // Obtener el idPersona generado
                 try (ResultSet rs = stmt.getGeneratedKeys()) {
                     if (rs.next()) {
@@ -107,26 +112,33 @@ public class EstudianteControlador {
                 }
             }
 
-            // Insertar Dirección
-            try (PreparedStatement stmt = connection.prepareStatement(insertDireccion)) {
+
+            int idDireccion;
+            try (PreparedStatement stmt = connection.prepareStatement(insertDireccion, Statement.RETURN_GENERATED_KEYS)) {
                 stmt.setString(1, calle);
                 stmt.setString(2, ciudad);
                 stmt.setInt(3, codPostal);
                 stmt.setInt(4, idPais);
                 stmt.executeUpdate();
+
+                // Obtener el idDireccion generado
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        idDireccion = rs.getInt(1);
+                    } else {
+                        throw new SQLException("Error al obtener el ID de la dirección.");
+                    }
+                }
             }
 
-            // Asociar Dirección con Persona
-            try (PreparedStatement stmt = connection.prepareStatement("UPDATE persona SET idDireccion = (SELECT idDireccion FROM direccion WHERE calle = ? AND ciudad = ? AND codPostal = ? AND idPais = ?) WHERE idPersona = ?")) {
-                stmt.setString(1, calle);
-                stmt.setString(2, ciudad);
-                stmt.setInt(3, codPostal);
-                stmt.setInt(4, idPais);
-                stmt.setInt(5, idPersona);
+
+            try (PreparedStatement stmt = connection.prepareStatement("UPDATE persona SET idDireccion = ? WHERE idPersona = ?")) {
+                stmt.setInt(1, idDireccion);
+                stmt.setInt(2, idPersona);
                 stmt.executeUpdate();
             }
 
-            // Insertar Estudiante
+
             try (PreparedStatement stmt = connection.prepareStatement(insertEstudiante)) {
                 stmt.setInt(1, idPersona);
                 stmt.executeUpdate();
